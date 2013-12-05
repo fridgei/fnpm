@@ -12,19 +12,16 @@ META_RANKING = {
 version_grammar = """
 N = (<digit+> | 'x' | '*')
 N1 = '.' N
-V = <O N N1{0,2} (META | BUILD){0,1}>:version -> version
-V1 = <O>:op <N N1{0,3}>:version (META1 | BUILD1){0,1}:type_and_num ->  VersionMatcher( op, version.split('.'), type_and_num[0][0] if type_and_num else '', type_and_num[0][1] if type_and_num else '')
-DASHED = V:l '-' V:r -> map(VersionMatcher, [">="+ l,  "<=" + r])
+V = <O>:op <N N1{0,3}>:version (META | BUILD){0,1}:type_and_num -> op, version.split('.'), type_and_num[0] if type_and_num else '', type_and_num[1] if type_and_num and len(type_and_num) == 2 else ''
+V1 = <O>:op <N N1{0,3}>:version (META | BUILD){0,1}:type_and_num ->  VersionMatcher( op, version.split('.'), type_and_num[0][0] if type_and_num else '', type_and_num[0][1] if type_and_num else '')
+DASHED = V:l '-' V:r -> [VersionMatcher(">=", *l[1:]) , VersionMatcher("<=", *r[1:])]
 O = ('~' | '^' | '<=' | '<' | '>=' | '>' ){0,1}
-O1 = <('~' | '^' | '<=' | '<' | '>=' | '>' ){0,1}>:op -> op
-BUILD = '+build' N+
-BUILD1 = '+build' <N+>:num -> 'build', num
-META = ('-alpha' | '-beta' | '-rc') digit*
-META1 = ('-alpha' | '-beta' | '-rc'):type <digit*>:num -> type[1:] if type else type, num
+BUILD = '+build' <N+>:num -> 'build', num
+META = ('-alpha' | '-beta' | '-rc'):type <digit*>:num -> type[1:] if type else type, num
 RULES = V1+:rules -> rules
 RANGE = (RULES:z RANGE1*:y) -> [z] + y
 RANGE1 = '||' RULES:x -> x
-LOL = RANGE | DASHED | RULES
+LOL = DASHED | RANGE | RULES
 """
 
 
@@ -140,3 +137,4 @@ parser = parsley.makeGrammar(
 )
 
 print parser('~3.4.3-alpha4||3.2.4||3.2<3.3.3').LOL()
+print parser("1.1.1-2.2.2").LOL()
