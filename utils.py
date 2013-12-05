@@ -108,7 +108,7 @@ class VersionMatcher:
         if self.build_type == 'build' and other.build_type == 'build':
             return 0
         elif self.build_type == other.build_type:
-            return int(self.build_num or 0) - int(other.build_num or 0)
+            return self.build_num - other.build_num
         return META_RANKING[self.build_type] - META_RANKING[other.build_type]
 
     def compare_approximate(self, other):
