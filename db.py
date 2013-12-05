@@ -6,7 +6,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import TypeDecorator, VARCHAR
 
-from utils import VersionMatcher
+from utils import parser, VersionMatcher
 
 
 db = SQLAlchemy()
@@ -31,6 +31,27 @@ class JSONEncodedDict(TypeDecorator):
         if not value:
             return None
         return json.loads(value)
+
+
+class SemverType(TypeDecorator):
+   
+    impl = VARCHAR
+    
+    def process_bind_param(self, value, dialect):
+        if not value:
+            return None
+        try:
+            parser(value).V()
+        except:
+            raise InvalidVersion(
+                "{0} is not a valid version".format(value)
+            )
+        return value
+
+    def process_result_param(self, value, dialect):
+        if not value:
+            return None
+        return parser(value).RULE()[0]
 
 
 class Package(db.Model):
@@ -81,7 +102,8 @@ class Package(db.Model):
         return data
 
     def is_local(self, other):
-        relative_re = '((?:<=|<|>=|>|~|\^){0,1}(?:[\d.]+))'
+        other = parser(other).LOL()
+
         if any(other.startswith(x) for x in ('<', '>')):
             other = other.replace(' ', '')
             matchers = [
@@ -165,7 +187,7 @@ class Version(db.Model):
     __tablename__ = "version"
     id = db.Column(db.Integer, primary_key=True)
     package_id = db.Column(db.String, db.ForeignKey('package.id'))
-    version = db.Column(db.String, unique=False, nullable=False)
+    version = db.Column(SemverType, unique=False, nullable=False)
     json_data = db.Column(JSONEncodedDict, unique=True, nullable=False)
 
     def __init__(self, version, json_data):
