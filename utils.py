@@ -19,13 +19,19 @@ version_grammar = """
 N = (<digit+> | 'x' | '*')
 N1 = '.' N
 V = <O N N1{0,2} (META | BUILD){0,1}>:version -> version
+V1 = <O>:op <N N1{0,3}>:version <(META1 | BUILD1){0,1}>:type_and_num ->  op, version, type_and_num[0] , type_and_num[1]
 DASHED = V:l '-' V:r -> map(VersionMatcher, [">="+ l,  "<=" + r])
 O = ('~' | '^' | '<=' | '<' | '>=' | '>' ){0,1}
+O1 = <('~' | '^' | '<=' | '<' | '>=' | '>' ){0,1}>:op -> op
 BUILD = '+build' N+
+BUILD1 = '+build' <N+>:num -> 'build', num
 META = ('-alpha' | '-beta' | '-rc') digit*
-RULE = V+:rules -> map(VersionMatcher, rules)
-RANGE = (RULE:z RANGE1*:y) -> [z] + y
-RANGE1 = '||' RULE:x -> x
+META1 = ('-alpha' | '-beta' | '-rc'):type <digit*>:num -> type[1:], num
+RULE = V:rule -> VersionMatcher(rule)
+RULES = V+:rules -> map(VersionMatcher, rules)
+RANGE = (RULES:z RANGE1*:y) -> [z] + y
+RANGE1 = '||' RULES:x -> x
+LOL = RANGE | DASHED | RULE
 """
 
 
@@ -132,7 +138,9 @@ parser = parsley.makeGrammar(
     version_grammar, {'VersionMatcher': VersionMatcher}
 )
 
-print parser("<3.2.4~4.4.4").RULE()
+print parser("<3.2.4~4.4.4").RULES()
 print parser("2.3.4-3.3.3").DASHED()
-print parser("*").RULE()
+print parser("*").RULES()
 print parser("2.3.4~3||~2||<6||~1||^3.2||~1").RANGE()
+print "2.3.4-beta3"
+print parser("~2.3.4-beta3").V1()
