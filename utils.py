@@ -26,10 +26,27 @@ LOL = DASHED | RANGE | RULES
 
 
 def pad(v):
+    # pad lists to 3 zeros
     return list(islice(chain(v, repeat(0)), 3))
 
 
 class VersionMatcher:
+    """
+    This class wraps versions and allows you to compare version definitions.
+    Versions are treated as an operator, a list of version elements, a build
+    type and the build number.
+    ex:
+        1.2.3-beta3
+        op='', version=[1, 2, 3], build_type='beta', buld_num=3
+        ~1.3
+        op='~', version[1, 3] build_type='', build_num=0
+
+    __eq__ does the heavy listing of determining how to compare version
+    matchers.  __lt__ can be implemented and we can use
+    functools.totalordering to generate the rest of the comparators so we can
+    sort lists of versions without operators.  This is useful for determining
+    the latest version out of a list of versions.
+    """
     def __init__(self, op, version, build_type, build_number):
         self.op = op or None
         self.version = version
@@ -37,15 +54,24 @@ class VersionMatcher:
         self.build_number = int(build_number or 0)
 
     def relative_eq(self, other):
+        """
+        Used for checking if two versions are equal comapres the build numbers
+        and build type to make sure that alpha < beta < rc < build and that
+        rc1 < rc3 and things like that.
+        """
         meta_compare = self.compare_meta_version(other)
         return self.version == other.version and meta_compare == 0
 
     def __eq__(self, other):
+        """
+        Determine what type of comparison to do based on the version matchers
+        operator
+        """
         if self.op is None:
-            if all(x.isdigit() for x in self.version.split('.')):
+            if all(x.isdigit() for x in self.version):
                 return self.relative_eq(other)
-            elif 'x' in self.version.lower():
-                return self.wild_card_compare(other)
+            elif 'x' in self.version:
+                return self.compare_wild_card(other)
             elif self.version.startswith('*'):
                 return True
         elif '~' == self.op:
@@ -95,11 +121,9 @@ class VersionMatcher:
     def relative_gte(self, other):
         return self.relative_gt(other) or self.relative_eq(other)
 
-    def wild_card_eq(self, other):
-        v_other = other.version.lower()
-        v = self.version
+    def compare_wild_card(self, other):
         matched = all(
-            e1 == e2 or e1 == 'x' for e1, e2 in zip(v, v_other)
+            a == b or a == 'x' for a, b in zip(self.version, other.version)
         )
         meta_compare = self.compare_meta_version(other)
         return matched and meta_compare == 0
@@ -131,7 +155,15 @@ class VersionMatcher:
                 break
             upper.append(e)
         return pad(lower) <= pad(other) < pad(upper)
-
+"""
+This creates a parser from the grammar that creates lists of VersionMatchers.
+For a list of depth 1 all patterns must match for a list of lists one of the
+lists must match completely.  This is used to represented range version
+matchers.
+ex:
+    <1.2.3 >5.3.3 -> [<1.2.3, >5.3.3]
+    <1.2.3 >5.3.3||~2||x.x.x-rc4 -> [[<1.2.3, >5.3.3], [~2], [x.x.x-rc4]]
+"""
 parser = parsley.makeGrammar(
     version_grammar, {'VersionMatcher': VersionMatcher}
 )
