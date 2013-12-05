@@ -1,0 +1,11 @@
+Flask==0.10.1
+Flask-SQLAlchemy==1.0
+Jinja2==2.7.1
+MarkupSafe==0.18
+SQLAlchemy==0.8.2
+Werkzeug==0.9.4
+itsdangerous==0.23
+pysqlite==2.6.3
+requests==1.2.3
+wsgiref==0.1.2
+parsley==1.2
